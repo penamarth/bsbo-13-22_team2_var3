@@ -71,6 +71,13 @@ public class Поликлиника
         {
             администратор.ПодтвердитьЗапись(пациент, дата, время);
             ОбновитьДоступностьПослеЗаписи(дата, время);
+
+            // Уведомление для пациента
+            Console.WriteLine($"Уведомление для пациента: Вы записаны на приём к врачу на {дата.ToShortDateString()} в {время}.");
+
+            // Уведомление для врача
+            Console.WriteLine($"Уведомление для врача: У вас назначен приём с пациентом на {дата.ToShortDateString()} в {время}.");
+
             return true;
         }
         else
@@ -82,15 +89,11 @@ public class Поликлиника
 
     private bool ПроверитьДоступность(DateTime дата, TimeSpan время)
     {
-        if (!доступныеВремена.ContainsKey(дата))
+        if (доступныеВремена.ContainsKey(дата))
         {
-            доступныеВремена[дата] = new List<TimeSpan>();
-            for (int i = 9; i < 17; i++) // доступные часы с 9:00 до 17:00
-            {
-                доступныеВремена[дата].Add(new TimeSpan(i, 0, 0));
-            }
+            
         }
-        return доступныеВремена[дата].Contains(время);
+        return true;
     }
 
     private void ОбновитьДоступностьПослеЗаписи(DateTime дата, TimeSpan время)
@@ -100,21 +103,7 @@ public class Поликлиника
             доступныеВремена[дата].Remove(время);
         }
     }
-    public void ВывестиДоступныеВремена(DateTime дата)
-    {
-        if (доступныеВремена.ContainsKey(дата))
-        {
-            Console.WriteLine($"Доступные времена на {дата.ToShortDateString()}:");
-            foreach (var время in доступныеВремена[дата])
-            {
-                Console.WriteLine(время);
-            }
-        }
-        else
-        {
-            Console.WriteLine("Нет доступных времен на выбранную дату.");
-        }
-    }
+    
 
     public void ОбработатьЗапросНаУчетФактаПриема(Врач врач, Пациент пациент, МедКарта медКарта, string запись)
     {
@@ -259,7 +248,7 @@ public class Program
                         Console.WriteLine("Введите дату приёма (гггг,мм,дд):");
                         DateTime желаемаяДата = DateTime.Parse(Console.ReadLine());
 
-                        поликлиника.ВывестиДоступныеВремена(желаемаяДата);
+                       
 
                         Console.WriteLine("Введите время приёма (чч:мм):");
                         TimeSpan желаемоеВремя = TimeSpan.Parse(Console.ReadLine());
