@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,11 +15,11 @@ public interface ISubject
     void NotifyObservers(string message);
 }
 
-public class Поликлиника : ISubject
+public class Поликлиника
 {
     public List<Пациент> Пациенты { get; private set; }
     private Dictionary<DateTime, List<TimeSpan>> доступныеВремена;
-    private List<IObserver> observers;
+    private List<ЗаписьНаПрием> записиНаПрием;
 
     public Врач Врач { get; private set; }
     public Администратор Администратор { get; private set; }
@@ -27,20 +28,18 @@ public class Поликлиника : ISubject
     {
         Пациенты = new List<Пациент>();
         доступныеВремена = new Dictionary<DateTime, List<TimeSpan>>();
-        observers = new List<IObserver>();
+        записиНаПрием = new List<ЗаписьНаПрием>();
     }
 
     public void НазначитьВрача(string фио)
     {
         Врач = new Врач { ФИО = фио };
-        Attach(Врач);
         Console.WriteLine($"Назначен врач: {Врач.ФИО}");
     }
 
     public void НазначитьАдминистратора(string фио)
     {
         Администратор = new Администратор { ФИО = фио };
-        Attach(Администратор);
         Console.WriteLine($"Назначен администратор: {Администратор.ФИО}");
     }
 
@@ -57,7 +56,6 @@ public class Поликлиника : ISubject
         };
         Пациенты.Add(новыйПациент);
         Console.WriteLine($"{новыйПациент.Фамилия} {новыйПациент.Имя} {новыйПациент.Отчество} добавлен(а) на учет.");
-        NotifyObservers("Добавлен новый пациент.");
     }
 
     public void ПоказатьПациентов()
@@ -82,7 +80,6 @@ public class Поликлиника : ISubject
             {
                 Пациенты.Remove(пациент);
                 Console.WriteLine($"Пациент {пациент.Фамилия} {пациент.Имя} {пациент.Отчество} снят с учета.");
-                NotifyObservers("Пациент снят с учета.");
             }
             else
             {
@@ -115,12 +112,30 @@ public class Поликлиника : ISubject
             var запись = new ЗаписьНаПрием(пациент, Врач, дата, время);
             запись.Attach(пациент);
             запись.Attach(Врач);
+            запись.Attach(Администратор);
             запись.ПодтвердитьЗапись();
             ОбновитьДоступностьПослеЗаписи(дата, время);
+            записиНаПрием.Add(запись);
         }
         else
         {
             Console.WriteLine("Выбранное время недоступно.");
+        }
+    }
+
+
+    public void ИзменитьВремяЗаписи(string имяПациента, DateTime новаяДата, TimeSpan новоеВремя)
+    {
+        var запись = записиНаПрием.FirstOrDefault(z => z.Пациент.Имя == имяПациента);
+        if (запись != null && ПроверитьДоступность(новаяДата, новоеВремя))
+        {
+            обновитьДоступностьПослеОтмены(запись.Дата, запись.Время);
+            запись.ИзменитьВремя(новаяДата, новоеВремя);
+            ОбновитьДоступностьПослеЗаписи(новаяДата, новоеВремя);
+        }
+        else
+        {
+            Console.WriteLine("Запись не найдена или выбранное время недоступно.");
         }
     }
 
@@ -135,50 +150,52 @@ public class Поликлиника : ISubject
 
     private void ОбновитьДоступностьПослеЗаписи(DateTime дата, TimeSpan время)
     {
-        if (доступныеВремена.ContainsKey(дата))
+        if (!доступныеВремена.ContainsKey(дата))
         {
-            доступныеВремена[дата].Remove(время);
+            доступныеВремена[дата] = new List<TimeSpan>();
         }
+
+        доступныеВремена[дата].Remove(время);
     }
 
-    public void Attach(IObserver observer)
+    private void обновитьДоступностьПослеОтмены(DateTime дата, TimeSpan время)
     {
-        observers.Add(observer);
-    }
-
-    public void Detach(IObserver observer)
-    {
-        observers.Remove(observer);
-    }
-
-    public void NotifyObservers(string message)
-    {
-        foreach (var observer in observers)
+        if (!доступныеВремена.ContainsKey(дата))
         {
-            observer.Update(message);
+            доступныеВремена[дата] = new List<TimeSpan>();
         }
+
+        доступныеВремена[дата].Add(время);
     }
 }
 
 public class ЗаписьНаПрием : ISubject
 {
     private List<IObserver> observers = new List<IObserver>();
-    private Пациент пациент;
-    private Врач врач;
-    private DateTime дата;
-    private TimeSpan время;
+    public Пациент Пациент { get; private set; }
+    public Врач Врач { get; private set; }
+    public DateTime Дата { get; private set; }
+    public TimeSpan Время { get; private set; }
 
     public ЗаписьНаПрием(Пациент пациент, Врач врач, DateTime дата, TimeSpan время)
     {
-        this.пациент = пациент;
-        this.врач = врач;
-        this.дата = дата;
-        this.время = время;
+        this.Пациент = пациент;
+        this.Врач = врач;
+        this.Дата = дата;
+        this.Время = время;
     }
 
     public void ПодтвердитьЗапись()
     {
-        string message = $"Запись на прием: Пациент {пациент.Имя} {пациент.Фамилия} к врачу {врач.ФИО} на {дата.ToShortDateString()} в {время}.";
+        string message = $"Запись на прием: Пациент {Пациент.Имя} {Пациент.Фамилия} к врачу {Врач.ФИО} на {Дата.ToShortDateString()} в {Время}.";
+        NotifyObservers(message);
+    }
+
+    public void ИзменитьВремя(DateTime новаяДата, TimeSpan новоеВремя)
+    {
+        Дата = новаяДата;
+        Время = новоеВремя;
+        string message = $"Изменено время записи: Пациент {Пациент.Имя} {Пациент.Фамилия} к врачу {Врач.ФИО} на {новаяДата.ToShortDateString()} в {новоеВремя}.";
         NotifyObservers(message);
     }
 
@@ -244,6 +261,7 @@ public class Program
         поликлиника.НазначитьВрача("Иванов Иван Иванович");
         поликлиника.НазначитьАдминистратора("Сидоров Алексей Петрович");
 
+
         while (true)
         {
             Console.WriteLine("Выберите действие:");
@@ -251,6 +269,7 @@ public class Program
             Console.WriteLine("2. Показать пациентов");
             Console.WriteLine("3. Снять пациента с учета");
             Console.WriteLine("4. Записать пациента на прием");
+            Console.WriteLine("5. Изменить время записи");
             Console.WriteLine("0. Выход");
 
             string выбор = Console.ReadLine();
@@ -263,7 +282,7 @@ public class Program
                     string фамилия = Console.ReadLine();
                     Console.WriteLine("Введите отчество:");
                     string отчество = Console.ReadLine();
-                    Console.WriteLine("Введите дату рождения (гггг,мм,дд):");
+                    Console.WriteLine("Введите дату рождения (гггг, мм, дд):");
                     DateTime датаРождения = DateTime.Parse(Console.ReadLine());
                     поликлиника.ПостановкаНаУчет(имя, фамилия, отчество, датаРождения);
                     break;
@@ -279,11 +298,21 @@ public class Program
                 case "4":
                     Console.WriteLine("Введите ID пациента:");
                     int patientId = int.Parse(Console.ReadLine());
-                    Console.WriteLine("Введите дату приема (гггг,мм,дд):");
+                    Console.WriteLine("Введите дату приема (гггг, мм, дд):");
                     DateTime дата = DateTime.Parse(Console.ReadLine());
                     Console.WriteLine("Введите время приема (чч:мм):");
                     TimeSpan время = TimeSpan.Parse(Console.ReadLine());
                     поликлиника.ЗаписьНаПрием(patientId, дата, время);
+                    break;
+
+                case "5":
+                    Console.WriteLine("Введите имя пациента для изменения времени записи:");
+                    string имяПациента = Console.ReadLine();
+                    Console.WriteLine("Введите новую дату приема (гггг, мм, дд):");
+                    DateTime новаяДата = DateTime.Parse(Console.ReadLine());
+                    Console.WriteLine("Введите новое время приема (чч:мм):");
+                    TimeSpan новоеВремя = TimeSpan.Parse(Console.ReadLine());
+                    поликлиника.ИзменитьВремяЗаписи(имяПациента, новаяДата, новоеВремя);
                     break;
 
                 case "0":
